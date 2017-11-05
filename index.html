@@ -1,0 +1,120 @@
+<html>
+    <head>
+        <script
+        src="https://code.jquery.com/jquery-3.2.1.min.js"
+        integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+        crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.4/lodash.min.js"></script>
+        <!-- Latest compiled and minified CSS -->
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+        <!-- Latest compiled and minified JavaScript -->
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>        
+        <script src="js/vexflow-min.js"></script>        
+        <title>Cavantar GitHub Page</title>
+        <script type="text/javascript">
+            $.tmpl = function(str, obj) {
+                do {
+                    var beforeReplace = str;
+                    str = str.replace(/#{([^}]+)}/g, function(wholeMatch, key) {
+                        var substitution = obj[$.trim(key)];
+                        return (substitution === undefined ? wholeMatch : substitution);
+                    });
+                    var afterReplace = str !== beforeReplace;
+                } while (afterReplace);
+
+                return str;
+            };
+            var notes = "ABCDEFG";
+
+            function getNote(currentNote, interval) {
+                var currentNoteIndex = notes.indexOf(currentNote);
+                var newNoteIndex = (currentNoteIndex + interval) % notes.length;
+                return notes.charAt(newNoteIndex);
+            };
+
+            function renderNotes(notes) {
+                $("#staffDisplayDiv").html("");
+                var vf = new Vex.Flow.Factory({renderer: {elementId: 'staffDisplayDiv'}});
+                var score = vf.EasyScore();
+                var system = vf.System();
+
+                var notesString = notes.length > 1 ? '(' + notes.join(' ') +')' : notes[0];
+                notesString += "/w";
+                system.addStave({
+                    voices: [
+                        score.voice(score.notes(notesString))
+                        ]
+                }).addClef('treble').addTimeSignature('4/4');
+
+                vf.draw();
+            }
+
+            function renderButtons(buttonLabels, functionName) {
+                var buttonsStr = "";
+
+                buttonStr = _.map(buttonLabels, function(label) {
+                    return $.tmpl("<button type='button' onclick=\"#{functionName}('#{label}')\" class='btn btn-default' id='button_#{label}'> #{label} </button>",
+                            {label : label, functionName : functionName});
+                }).join(' ');
+
+                return buttonStr;
+            }
+            var successCount = 0;
+            var failureCount = 0;
+            function selectedNote(noteName) {
+                if(noteName != desiredAnswer) {
+                    $("#button_" + noteName).attr("class", "btn btn-danger");
+                    failureCount++;
+                } else {
+                    $("#button_" + noteName).attr("class", "btn btn-success");
+                    renderNotes([startNote + "4", desiredAnswer + "4"])                    
+                    setTimeout(askQuestion, 1000)
+                    successCount++;
+                }
+
+                refreshSuccessCounter();
+            }
+
+            function refreshSuccessCounter() {
+                var successPerc = (successCount / (successCount + failureCount)) * 100.0;
+                successPerc = successPerc.toFixed(2);
+                var successStr = $.tmpl("#{successCount}/#{totalCount} - #{percentage} %", 
+                    {successCount : successCount, totalCount : successCount + failureCount, percentage : successPerc}
+                    );
+                $("#successCounter").html(successStr);
+            }
+
+            var startNote     = null;
+            var desiredAnswer = null;
+            function askQuestion() {
+                var note     = _.sample(notes.split(''));
+                var interval = _.random(2, 7);
+
+                renderNotes([note + "4"]);
+
+                $("#intervalAskerDiv").html("<p> " + note + " -> " + interval + "</p>");
+                $("#intervalAskerDiv").append(renderButtons(notes.split(''), "selectedNote"));
+                startNote     = note;
+                desiredAnswer = getNote(note, interval -1);
+            }
+
+            var VF = Vex.Flow;
+            $(document).ready(function() {
+                var test = "";
+                test = getNote("C", );
+                $("#intervalAskerDiv").html(test);
+                // renderNotes(["C4", "B4"]);
+
+                askQuestion();
+            });
+        </script>
+    </head>
+    <body class="container-fluid">
+        <div class="well well-lg" style="margin-top: 20px;">
+            <h2> Interval Asker</h2>
+            <div id="staffDisplayDiv"></div>
+            <div id="intervalAskerDiv"></div>
+            <h3 id="successCounter"></h3>
+        </div>
+    </body>
+</html>
