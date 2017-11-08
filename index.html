@@ -35,6 +35,23 @@
                 var newNoteIndex = (currentNoteIndex + interval) % notes.length;
                 return notes.charAt(newNoteIndex);
             };
+            
+            function getNoteAccurate(currentNote, interval) {
+                var octave = parseInt(currentNote.charAt(1));
+                var currentNoteIndex = notes.indexOf(currentNote.charAt(0));
+                var newNoteIndex = (currentNoteIndex + interval) % notes.length;
+                
+                console.log("current: " + currentNoteIndex + " new: " + newNoteIndex + " C: " + notes.indexOf('C'));
+
+                if(currentNoteIndex < newNoteIndex) {
+                        if(currentNoteIndex < notes.indexOf('C') && newNoteIndex >= notes.indexOf('C')) octave++;
+                }
+                else {
+                    if(newNoteIndex >= notes.indexOf('C')) octave++;
+                }                    
+
+                return notes.charAt(newNoteIndex) + octave;
+            };
 
             function renderNotes(notes) {
                 $("#staffDisplayDiv").html("");
@@ -68,15 +85,23 @@
             function selectedNote(noteName) {
                 if(noteName != desiredAnswer) {
                     $("#button_" + noteName).attr("class", "btn btn-danger");
+                    statistics.intervals[askedInterval].failureCount++;
+                    statistics.notes[askedNote].failureCount++;
+
                     failureCount++;
                 } else {
                     $("#button_" + noteName).attr("class", "btn btn-success");
-                    renderNotes([startNote + "4", desiredAnswer + "4"])                    
-                    setTimeout(askQuestion, $("#delayTime").val())
+                    var accurateNote = askedNote + "4";
+                    renderNotes([accurateNote, getNoteAccurate(accurateNote, askedInterval)]);                    
+                    setTimeout(askQuestion, $("#delayTime").val());
+                    statistics.intervals[askedInterval].successCount++;
+                    statistics.notes[askedNote].successCount++;
+
                     successCount++;
                 }
 
                 refreshSuccessCounter();
+                refreshCharts();
             }
 
             function refreshSuccessCounter() {
@@ -88,17 +113,18 @@
                 $("#successCounter").html(successStr);
             }
 
-            var startNote     = null;
+            var askedNote     = null;
             var desiredAnswer = null;
+            var askedInterval = null;
             function askQuestion() {
                 var note     = _.sample(_.filter(notes.split(''), function(note) { return $("#note_" + note).is(":checked")}));
                 var interval = _.sample(_.range(2, 8).filter(function(interval) { return $("#interval_" + interval).is(":checked")}))
-
+                askedInterval = interval;
+                askedNote     = note;
                 renderNotes([note + "4"]);
 
                 $("#intervalAskerDiv").html("<p> " + note + " -> " + interval + "</p>");
                 $("#intervalAskerDiv").append(renderButtons(notes.split(''), "selectedNote"));
-                startNote     = note;
                 desiredAnswer = getNote(note, interval -1);
             }
 
@@ -124,7 +150,8 @@
                     $("<div>", { class : stringForGrid(6), id : "noteChart", style : "height: 300px" })
                 );
             }
-            function getChart(divId) {
+            var statistics = { intervals : {}, notes : {}};
+            function createChart(divId) {
                 return c3.generate({
                     bindto: '#' + divId,
                     data: {
@@ -140,6 +167,8 @@
                             type : 'category'
                         },
                         y: {
+                            min : 0, max : 100,
+                            padding : { top : 0, bottom : 0 },
                             label: {
                                 text: "Percentage",
                                 position: 'outer-middle'
@@ -152,26 +181,44 @@
             var intervalChart = null;
             var noteChart = null;
 
+            function getGroupStatistics(groupObject) {
+                return _.values(groupObject).map(function(value) {
+                    var result = (value.successCount / (value.successCount + value.failureCount)) * 100.0;
+                    return _.isNaN(result) ? 100.0 : result;
+                });
+            }
+            function refreshCharts() {
+                _.forEach([
+                    { groupStatistic : statistics.intervals, label : "Intervals", chartObject : intervalChart},
+                    { groupStatistic : statistics.notes, label : "Notes", chartObject : noteChart}
+                    ], function(definition) {
+                        var labels = _.keys(definition.groupStatistic);
+                        labels.unshift('x');
+                        var values = getGroupStatistics(definition.groupStatistic);
+                        values.unshift(definition.label);
+                        definition.chartObject.load({ columns: [labels, values] });
+                    })
+            }
+
             var VF = Vex.Flow;
             $(document).ready(function() {
                 renderConfig();
-                var test = "";
-                test = getNote("C", );
-                $("#intervalAskerDiv").html(test);
+                _.range(2,8).forEach(function(interval) {
+                    statistics.intervals[interval] = { successCount : 0, failureCount : 0 };
+                });
+
+                _.forEach(notes.split(''), function(note) {
+                    statistics.notes[note] = { successCount : 0, failureCount : 0 };
+                });
+
                 askQuestion();
 
-                intervalChart = getChart('intervalChart');
-                intervalChart.load({
-                        columns: [
-                            ['x', "a", "b"],
-                            ['cos', 300, 400]
-                            ]});
-                noteChart = getChart('noteChart');
-                noteChart.load({
-                        columns: [
-                            ['x', "a", "b"],
-                            ['cos', 300, 400]
-                            ]});
+                intervalChart = createChart('intervalChart');
+                noteChart = createChart('noteChart');
+
+                refreshCharts();
+
+                // $("body").append(getNoteAccurate("E3", 6))
             });
         </script>
     </head>
