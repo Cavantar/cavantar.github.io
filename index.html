@@ -9,7 +9,11 @@
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
         <!-- Latest compiled and minified JavaScript -->
         <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>        
-        <script src="js/vexflow-min.js"></script>        
+        <script src="js/vexflow-min.js"></script>
+        <link rel="stylesheet" href="css/c3.min.css">
+        <script src="js/c3.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.0/d3.min.js"></script>
+        
         <title>Cavantar GitHub Page</title>
         <script type="text/javascript">
             $.tmpl = function(str, obj) {
@@ -68,7 +72,7 @@
                 } else {
                     $("#button_" + noteName).attr("class", "btn btn-success");
                     renderNotes([startNote + "4", desiredAnswer + "4"])                    
-                    setTimeout(askQuestion, 1000)
+                    setTimeout(askQuestion, $("#delayTime").val())
                     successCount++;
                 }
 
@@ -87,8 +91,8 @@
             var startNote     = null;
             var desiredAnswer = null;
             function askQuestion() {
-                var note     = _.sample(notes.split(''));
-                var interval = _.random(2, 7);
+                var note     = _.sample(_.filter(notes.split(''), function(note) { return $("#note_" + note).is(":checked")}));
+                var interval = _.sample(_.range(2, 8).filter(function(interval) { return $("#interval_" + interval).is(":checked")}))
 
                 renderNotes([note + "4"]);
 
@@ -98,14 +102,76 @@
                 desiredAnswer = getNote(note, interval -1);
             }
 
+            function generateCheckboxes(dataSource, preId) {
+                return _.map(dataSource, function(data) {
+                    return $("<div>", {class : "checkbox"}).append(
+                        $("<label>").append($("<input/>", { type : "checkbox", id : preId + data, checked : "checked"}), data))
+                });
+            }
+            function stringForGrid(part) {
+                return _.map(["xs", "sm", "md", "lg"], function(unit) { return "col-" + unit + "-" + part;}).join(' ');
+            }
+
+            function renderConfig() {                
+                $("#config").append(
+                    $("<div>", { class : stringForGrid(2)}).append($("<h4>").text("Interval Selection"), generateCheckboxes(_.range(2,8), "interval_")),
+                    $("<div>", { class : stringForGrid(2)}).append($("<h4>").text("Note Selection")    , generateCheckboxes(notes.split(''), "note_")),
+                    $("<div>", { class : stringForGrid(2)}).append("Delay time", $("<input/>", { type: "number", value: 0, id : "delayTime"}))
+                );
+                $("#charts").append(
+                    $("<h2>", {style : "text-align: center"}).text("Charts"),
+                    $("<div>", { class : stringForGrid(6), id : "intervalChart", style : "height: 300px" }),
+                    $("<div>", { class : stringForGrid(6), id : "noteChart", style : "height: 300px" })
+                );
+            }
+            function getChart(divId) {
+                return c3.generate({
+                    bindto: '#' + divId,
+                    data: {
+                      x : 'x',
+                      columns: [],                      
+                      type : 'bar'
+                    },
+                    legend : {
+                        show : false
+                    },
+                    axis: {
+                        x : {
+                            type : 'category'
+                        },
+                        y: {
+                            label: {
+                                text: "Percentage",
+                                position: 'outer-middle'
+                            }
+                        }
+                    }
+                });
+            }
+
+            var intervalChart = null;
+            var noteChart = null;
+
             var VF = Vex.Flow;
             $(document).ready(function() {
+                renderConfig();
                 var test = "";
                 test = getNote("C", );
                 $("#intervalAskerDiv").html(test);
-                // renderNotes(["C4", "B4"]);
-
                 askQuestion();
+
+                intervalChart = getChart('intervalChart');
+                intervalChart.load({
+                        columns: [
+                            ['x', "a", "b"],
+                            ['cos', 300, 400]
+                            ]});
+                noteChart = getChart('noteChart');
+                noteChart.load({
+                        columns: [
+                            ['x', "a", "b"],
+                            ['cos', 300, 400]
+                            ]});
             });
         </script>
     </head>
@@ -115,6 +181,9 @@
             <div id="staffDisplayDiv"></div>
             <div id="intervalAskerDiv"></div>
             <h3 id="successCounter"></h3>
+            <div id="config" class="row"></div>
+            <div id="charts" class="row"></div>
+            <div style="clear:both"></div>
         </div>
     </body>
 </html>
