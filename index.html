@@ -44,7 +44,7 @@
                 console.log("current: " + currentNoteIndex + " new: " + newNoteIndex + " C: " + notes.indexOf('C'));
 
                 if(currentNoteIndex < newNoteIndex) {
-                        if(currentNoteIndex < notes.indexOf('C') && newNoteIndex >= notes.indexOf('C')) octave++;
+                        if(currentNoteIndex <= notes.indexOf('C') && newNoteIndex >= notes.indexOf('C')) octave++;
                 }
                 else {
                     if(newNoteIndex >= notes.indexOf('C')) octave++;
@@ -199,6 +199,22 @@
                         definition.chartObject.load({ columns: [labels, values] });
                     })
             }
+            var slideTime = 250;
+            function showHelp(full) {
+                var helpContent = "";
+                var intervals = _.range(1, 8);
+                if(!full) helpContent = _.map(notes.split(''), function(note) { return $("<p>", {style : "background-color: " + (askedNote == note ? "#d0e9c6": "white")}).text(note + " -> " + getNote(note, askedInterval - 1));});
+                else {
+                    helpContent = $("<table>", { class: "table table-striped"}).append(
+                        $("<thead>").html($("<tr>").html(_.map(intervals, function(interval) { return $("<th>").text(interval);}))),
+                        $("<tbody>").html(_.map(notes.split(''), function(note) { 
+                            return $("<tr>").html(_.map(intervals, function(interval) { return $("<td>", { class : (note == askedNote || interval == askedInterval) ? "success" : "" }).text(getNote(note, interval));}))
+                        }))
+                    );
+                }
+                $("#help").html(helpContent).slideDown(slideTime);
+                setTimeout(function() { $("#help").slideUp(slideTime); }, 5000);                
+            }
 
             var VF = Vex.Flow;
             $(document).ready(function() {
@@ -217,16 +233,26 @@
                 noteChart = createChart('noteChart');
 
                 refreshCharts();
+                showHelp(true);
             });
         </script>
     </head>
     <body class="container-fluid">
         <div class="well well-lg" style="margin-top: 20px;">
             <h2> Interval Asker</h2>
-            <div id="staffDisplayDiv"></div>
-            <div id="intervalAskerDiv"></div>
-            <h3 id="successCounter"></h3>
-            <div id="config" class="row"></div>
+            <div class="row">
+                <div class="col-sm-6">        
+                    <div id="staffDisplayDiv"></div>
+                    <div id="intervalAskerDiv"></div>
+                    <h3 id="successCounter"></h3>
+                    <input type="button" class="btn btn-default" value="Show Help" onclick="showHelp(false)" style="margin-bottom: 1em"/>
+                    <input type="button" class="btn btn-default" value="Show Full Help" onclick="showHelp(true)" style="margin-bottom: 1em"/>
+                    <div class="well well-md" id="help" style="display: none"></div>
+                </div>
+                <div class="col-sm-6">        
+                    <div id="config" class="row"></div>
+                </div>
+            </div>
             <div id="charts" class="row"></div>
             <div style="clear:both"></div>
         </div>
