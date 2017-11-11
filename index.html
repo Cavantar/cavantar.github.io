@@ -94,10 +94,18 @@
                     var accurateNote = askedNote + "4";
                     renderNotes([accurateNote, getNoteAccurate(accurateNote, askedInterval)]);                    
                     setTimeout(askQuestion, $("#delayTime").val());
+
+                    var questionAnsweredTime = new Date().getTime();
+                    var timeDeltaMs = questionAnsweredTime - questionAskedTime;
+
                     statistics.intervals[askedInterval].successCount++;
                     statistics.notes[askedNote].successCount++;
-
                     successCount++;
+
+                    statistics.intervals[askedInterval].times.push(timeDeltaMs);
+                    statistics.notes[askedNote].times.push(timeDeltaMs);
+
+                    // $("body").append(timeDeltaMs);
                 }
 
                 refreshSuccessCounter();
@@ -116,8 +124,10 @@
             var askedNote     = null;
             var desiredAnswer = null;
             var askedInterval = null;
+            var questionAskedTime = 0;
+            var lastAskedNote = null;
             function askQuestion() {
-                var note     = _.sample(_.filter(notes.split(''), function(note) { return $("#note_" + note).is(":checked")}));
+                var note     = _.sample(_.filter(notes.split(''), function(note) { return $("#note_" + note).is(":checked") && note != lastAskedNote; }));
                 var interval = _.sample(_.range(2, 8).filter(function(interval) { return $("#interval_" + interval).is(":checked")}))
                 askedInterval = interval;
                 askedNote     = note;
@@ -125,7 +135,8 @@
 
                 $("#intervalAskerDiv").html("<p> " + note + " -> " + interval + "</p>");
                 $("#intervalAskerDiv").append(renderButtons(notes.split(''), "selectedNote"));
-                desiredAnswer = getNote(note, interval -1);
+                desiredAnswer = getNote(note, interval - 1);
+                questionAskedTime = new Date().getTime();
             }
 
             function generateCheckboxes(dataSource, preId) {
@@ -147,11 +158,13 @@
                 $("#charts").append(
                     $("<h2>", {style : "text-align: center"}).text("Charts"),
                     $("<div>", { class : stringForGrid(6), id : "intervalChart", style : "height: 300px" }),
-                    $("<div>", { class : stringForGrid(6), id : "noteChart", style : "height: 300px" })
+                    $("<div>", { class : stringForGrid(6), id : "noteChart"    , style : "height: 300px" }),
+                    $("<div>", { class : stringForGrid(6), id : "intervalChartMs", style : "height: 300px" }),
+                    $("<div>", { class : stringForGrid(6), id : "noteChartMs", style : "height: 300px" })
                 );
             }
             var statistics = { intervals : {}, notes : {}};
-            function createChart(divId) {
+            function createChart(divId, maxVal, label) {
                 return c3.generate({
                     bindto: '#' + divId,
                     data: {
@@ -167,10 +180,10 @@
                             type : 'category'
                         },
                         y: {
-                            min : 0, max : 100,
+                            min : 0, max : maxVal,
                             padding : { top : 0, bottom : 0 },
                             label: {
-                                text: "Percentage",
+                                text: label,
                                 position: 'outer-middle'
                             }
                         }
@@ -181,6 +194,9 @@
             var intervalChart = null;
             var noteChart = null;
 
+            var intervalChartMs = null;
+            var noteChartMs = null;
+
             function getGroupStatistics(groupObject) {
                 return _.values(groupObject).map(function(value) {
                     var result = (value.successCount / (value.successCount + value.failureCount)) * 100.0;
@@ -189,14 +205,23 @@
             }
             function refreshCharts() {
                 _.forEach([
-                    { groupStatistic : statistics.intervals, label : "Intervals", chartObject : intervalChart},
-                    { groupStatistic : statistics.notes, label : "Notes", chartObject : noteChart}
+                    { groupStatistic : statistics.intervals, label : "Intervals", chartObject : intervalChart, chartObjectMs : intervalChartMs},
+                    { groupStatistic : statistics.notes    , label : "Notes"    , chartObject : noteChart    , chartObjectMs : noteChartMs}
                     ], function(definition) {
                         var labels = _.keys(definition.groupStatistic);
                         labels.unshift('x');
+
                         var values = getGroupStatistics(definition.groupStatistic);
                         values.unshift(definition.label);
+
+                        var valuesMs = _.values(definition.groupStatistic).map( function(gg) {
+                            return _.mean(gg.times);
+                        });                        
+                        valuesMs.unshift(definition.label);
+                        console.log(valuesMs);
+
                         definition.chartObject.load({ columns: [labels, values] });
+                        definition.chartObjectMs.load({ columns: [labels, valuesMs] });
                     })
             }
             var slideTime = 250;
@@ -220,20 +245,22 @@
             $(document).ready(function() {
                 renderConfig();
                 _.range(2,8).forEach(function(interval) {
-                    statistics.intervals[interval] = { successCount : 0, failureCount : 0 };
+                    statistics.intervals[interval] = { successCount : 0, failureCount : 0, times : [] };
                 });
 
                 _.forEach(notes.split(''), function(note) {
-                    statistics.notes[note] = { successCount : 0, failureCount : 0 };
+                    statistics.notes[note] = { successCount : 0, failureCount : 0, times : [] };
                 });
 
                 askQuestion();
 
-                intervalChart = createChart('intervalChart');
-                noteChart = createChart('noteChart');
+                intervalChart = createChart('intervalChart', 100, "Percentage");
+                noteChart     = createChart('noteChart'    , 100, "Percentage");
+
+                intervalChartMs = createChart('intervalChartMs', 10000, "Time [ms]");
+                noteChartMs     = createChart('noteChartMs'    , 10000, "Time [ms]");
 
                 refreshCharts();
-                showHelp(true);
             });
         </script>
     </head>
