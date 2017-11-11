@@ -31,12 +31,14 @@
             var notes = "ABCDEFG";
 
             function getNote(currentNote, interval) {
+                interval -= 1;
                 var currentNoteIndex = notes.indexOf(currentNote);
                 var newNoteIndex = (currentNoteIndex + interval) % notes.length;
                 return notes.charAt(newNoteIndex);
             };
             
             function getNoteAccurate(currentNote, interval) {
+                interval -= 1;
                 var octave = parseInt(currentNote.charAt(1));
                 var currentNoteIndex = notes.indexOf(currentNote.charAt(0));
                 var newNoteIndex = (currentNoteIndex + interval) % notes.length;
@@ -64,26 +66,25 @@
                 var notesString = notes.length > 1 ? '(' + notes.join(' ') +')' : notes[0];
                 notesString += "/w";
                 system.addStave({
-                    voices: [
-                        score.voice(score.notes(notesString))
-                        ]
+                    voices: [ score.voice(score.notes(notesString)) ]
                 }).addClef('treble').addTimeSignature('4/4');
 
                 vf.draw();
             }
 
             function renderButtons(buttonLabels, functionName, type) {
-                return _.map(buttonLabels, function(label) {
-                    return $.tmpl("<button type='button' onclick=\"#{functionName}('#{label}', '#{type}')\" class='btn btn-default' id='button_#{label}'> #{label} </button>",
-                            {label : label, functionName : functionName, type : type });
-                }).join(' ');
+                return _.map(buttonLabels, label =>
+                            $.tmpl("<button type='button' onclick=\"#{functionName}('#{label}', '#{type}')\" class='btn btn-default' id='button_#{label}'> #{label} </button>",
+                            {label : label, functionName : functionName, type : type })
+                ).join(' ');
             }
             var successCount = 0;
             var failureCount = 0;
             function selected(selectedValue, type) {
                 if((type == "note"     && selectedValue != desiredNote) || 
-                   (type == "interval" && selectedValue != desiredInterval)) {
+                   (type == "interval" && selectedValue != askedInterval)) {
                     $("#button_" + selectedValue).attr("class", "btn btn-danger");
+
                     statistics.intervals[askedInterval].failureCount++;
                     statistics.notes[askedNote].failureCount++;
 
@@ -121,32 +122,24 @@
             var askedNote     = null;
             var askedInterval = null;
             var desiredNote     = null;
-            var desiredInterval = null;
             var questionAskedTime = 0;
-            var lastAskedNote = null;
             function askQuestion() {
-                var note     = _.sample(_.filter(notes.split(''), function(note) { return $("#note_" + note).is(":checked") && note != lastAskedNote; }));
-                var interval = _.sample(_.range(2, 8).filter(function(interval) { return $("#interval_" + interval).is(":checked")}))
-                askedInterval = interval;
-                askedNote     = note;
-
-                desiredNote     = getNote(note, interval - 1);                        
-                desiredInterval = interval;
+                askedNote    = _.sample(_.filter(notes.split(''), function(note) { return $("#note_" + note).is(":checked") && note != askedNote; }));
+                askedInterval = _.sample(_.range(2, 8).filter(function(interval) { return $("#interval_" + interval).is(":checked")}))
+                desiredNote  = getNote(askedNote, askedInterval);                                        
+                var accurateNote = askedNote + "4";
                 switch(globalMode) {
                     case "noteRecognition" : {
-                        renderNotes([note + "4"]);
-
-                        $("#intervalAskerDiv").html("<p> " + note + " -> " + interval + "</p>");
-                        $("#intervalAskerDiv").append(renderButtons(notes.split(''), "selected", "note"));
+                        renderNotes([accurateNote]);
+                        $("#intervalAskerDiv").html("<p> " + askedNote + " -> " + askedInterval + "</p>")
+                                              .append(renderButtons(notes.split(''), "selected", "note"));
                     } break;
                     case "intervalRecognition" : {
-                        var accurateNote        = note + "4";
-                        renderNotes([accurateNote, getNoteAccurate(accurateNote, interval - 1)]);
-                        $("#intervalAskerDiv").html("<p> " + note + " -> " + desiredNote + "</p>");
-                        $("#intervalAskerDiv").append(renderButtons(_.range(2,8), "selected", "interval"));
+                        renderNotes([accurateNote, getNoteAccurate(accurateNote, askedInterval)]);
+                        $("#intervalAskerDiv").html("<p> " + askedNote + " -> " + desiredNote + "</p>")
+                                              .append(renderButtons(_.range(2,8), "selected", "interval"));
                     } break;
                 }
-                lastAskedNote = askedNote;
                 questionAskedTime = new Date().getTime();
             }
 
@@ -157,7 +150,7 @@
                 });
             }
             function stringForGrid(part) {
-                return _.map(["xs", "sm", "md", "lg"], function(unit) { return "col-" + unit + "-" + part;}).join(' ');
+                return _.map(["xs", "sm", "md", "lg"], unit => "col-" + unit + "-" + part).join(' ');
             }
 
             function renderConfig() {                
@@ -168,10 +161,8 @@
                 );
                 $("#charts").append(
                     $("<h2>", {style : "text-align: center"}).text("Charts"),
-                    $("<div>", { class : stringForGrid(6), id : "intervalChart", style : "height: 300px" }),
-                    $("<div>", { class : stringForGrid(6), id : "noteChart"    , style : "height: 300px" }),
-                    $("<div>", { class : stringForGrid(6), id : "intervalChartMs", style : "height: 300px" }),
-                    $("<div>", { class : stringForGrid(6), id : "noteChartMs", style : "height: 300px" })
+                    _.map(["intervalChart", "noteChart", "intervalChartMs", "noteChartMs"], 
+                          id => $("<div>", { class : stringForGrid(6), id : id, style : "height: 300px" }))
                 );
             }
             var statistics = { intervals : {}, notes : {}};
@@ -188,7 +179,7 @@
                         else                    times = statistics.notes[notes.split('')[d.index]].times;                             
                         times.unshift(d.id);
 
-                        var tempChart = createChart("tempChart", 10000, "Intervals");
+                        var tempChart = createChart("tempChart", 10000, d.id);
                         tempChart.load({ columns : [['x'].concat(_.range(1, 10000)), times]});
                       }
                     },
@@ -238,22 +229,17 @@
                         labels.unshift('x');
 
                         var values = getGroupStatistics(definition.groupStatistic);
-                        values.unshift(definition.label);
+                        var valuesMs = _.values(definition.groupStatistic).map(obj => _.mean(obj.times));            
 
-                        var valuesMs = _.values(definition.groupStatistic).map( function(gg) {
-                            return _.mean(gg.times);
-                        });                        
-                        valuesMs.unshift(definition.label);
-
-                        definition.chartObject.load({ columns: [labels, values] });
-                        definition.chartObjectMs.load({ columns: [labels, valuesMs] });
+                        definition.chartObject  .load({ columns: [labels, [definition.label].concat(values)  ] });
+                        definition.chartObjectMs.load({ columns: [labels, [definition.label].concat(valuesMs)] });
                     })
             }
             var slideTime = 250;
             function showHelp(full) {
                 var helpContent = "";
                 var intervals = _.range(1, 8);
-                if(!full) helpContent = _.map(notes.split(''), function(note) { return $("<p>", {style : "background-color: " + (askedNote == note ? "#d0e9c6": "white")}).text(note + " -> " + getNote(note, askedInterval - 1));});
+                if(!full) helpContent = _.map(notes.split(''), function(note) { return $("<p>", {style : "background-color: " + (askedNote == note ? "#d0e9c6": "white")}).text(note + " -> " + getNote(note, askedInterval));});
                 else {
                     helpContent = $("<table>", { class: "table table-striped"}).append(
                         $("<thead>").html($("<tr>").html(_.map(intervals, function(interval) { return $("<th>").text(interval);}))),
