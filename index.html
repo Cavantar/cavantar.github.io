@@ -44,7 +44,9 @@
                 console.log("current: " + currentNoteIndex + " new: " + newNoteIndex + " C: " + notes.indexOf('C'));
 
                 if(currentNoteIndex < newNoteIndex) {
-                        if(currentNoteIndex <= notes.indexOf('C') && newNoteIndex >= notes.indexOf('C')) octave++;
+                        if(currentNoteIndex != notes.indexOf('C') && 
+                           currentNoteIndex <= notes.indexOf('C') && 
+                           newNoteIndex >= notes.indexOf('C')) octave++;
                 }
                 else {
                     if(newNoteIndex >= notes.indexOf('C')) octave++;
@@ -83,7 +85,7 @@
             var successCount = 0;
             var failureCount = 0;
             function selectedNote(noteName) {
-                if(noteName != desiredAnswer) {
+                if(noteName != desiredNote) {
                     $("#button_" + noteName).attr("class", "btn btn-danger");
                     statistics.intervals[askedInterval].failureCount++;
                     statistics.notes[askedNote].failureCount++;
@@ -104,8 +106,33 @@
 
                     statistics.intervals[askedInterval].times.push(timeDeltaMs);
                     statistics.notes[askedNote].times.push(timeDeltaMs);
+                }
 
-                    // $("body").append(timeDeltaMs);
+                refreshSuccessCounter();
+                refreshCharts();
+            }
+
+            function selectedInterval(interval) {
+                if(interval != desiredInterval) {
+                    $("#button_" + interval).attr("class", "btn btn-danger");
+                    statistics.intervals[askedInterval].failureCount++;
+                    statistics.notes[askedNote].failureCount++;
+
+                    failureCount++;
+                } else {
+                    $("#button_" + interval).attr("class", "btn btn-success");
+                    var accurateNote = askedNote + "4";
+                    setTimeout(askQuestion, $("#delayTime").val());
+
+                    var questionAnsweredTime = new Date().getTime();
+                    var timeDeltaMs = questionAnsweredTime - questionAskedTime;
+
+                    statistics.intervals[askedInterval].successCount++;
+                    statistics.notes[askedNote].successCount++;
+                    successCount++;
+
+                    statistics.intervals[askedInterval].times.push(timeDeltaMs);
+                    statistics.notes[askedNote].times.push(timeDeltaMs);
                 }
 
                 refreshSuccessCounter();
@@ -122,8 +149,9 @@
             }
 
             var askedNote     = null;
-            var desiredAnswer = null;
             var askedInterval = null;
+            var desiredNote     = null;
+            var desiredInterval = null;
             var questionAskedTime = 0;
             var lastAskedNote = null;
             function askQuestion() {
@@ -131,11 +159,25 @@
                 var interval = _.sample(_.range(2, 8).filter(function(interval) { return $("#interval_" + interval).is(":checked")}))
                 askedInterval = interval;
                 askedNote     = note;
-                renderNotes([note + "4"]);
 
-                $("#intervalAskerDiv").html("<p> " + note + " -> " + interval + "</p>");
-                $("#intervalAskerDiv").append(renderButtons(notes.split(''), "selectedNote"));
-                desiredAnswer = getNote(note, interval - 1);
+                desiredNote     = getNote(note, interval - 1);                        
+                desiredInterval = interval;
+                switch(globalMode) {
+                    case "noteRecognition" : {
+                        renderNotes([note + "4"]);
+
+                        $("#intervalAskerDiv").html("<p> " + note + " -> " + interval + "</p>");
+                        $("#intervalAskerDiv").append(renderButtons(notes.split(''), "selectedNote"));
+                    } break;
+                    case "intervalRecognition" : {
+                        var accurateNote        = note + "4";
+                        var desiredNoteAccurate = getNoteAccurate(accurateNote, interval - 1)
+                        renderNotes([accurateNote, desiredNoteAccurate]);
+                        $("#intervalAskerDiv").html("<p> " + note + " -> " + desiredNote + "</p>");
+                        $("#intervalAskerDiv").append(renderButtons(_.range(2,8), "selectedInterval"));
+                    } break;
+                }
+                lastAskedNote = askedNote;
                 questionAskedTime = new Date().getTime();
             }
 
@@ -218,7 +260,6 @@
                             return _.mean(gg.times);
                         });                        
                         valuesMs.unshift(definition.label);
-                        console.log(valuesMs);
 
                         definition.chartObject.load({ columns: [labels, values] });
                         definition.chartObjectMs.load({ columns: [labels, valuesMs] });
@@ -242,6 +283,7 @@
             }
 
             var VF = Vex.Flow;
+            var globalMode = null;
             $(document).ready(function() {
                 renderConfig();
                 _.range(2,8).forEach(function(interval) {
@@ -252,8 +294,6 @@
                     statistics.notes[note] = { successCount : 0, failureCount : 0, times : [] };
                 });
 
-                askQuestion();
-
                 intervalChart = createChart('intervalChart', 100, "Percentage");
                 noteChart     = createChart('noteChart'    , 100, "Percentage");
 
@@ -262,6 +302,12 @@
 
                 refreshCharts();
             });
+            function start(event, mode) {
+                event.target.parentNode.style.display = "none";
+                globalMode = mode;
+                askQuestion();
+            }
+
         </script>
     </head>
     <body class="container-fluid">
@@ -271,6 +317,10 @@
                 <div class="col-sm-6">        
                     <div id="staffDisplayDiv"></div>
                     <div id="intervalAskerDiv"></div>
+                    <div id="startButtons" >
+                        <input type="button" onclick="start(event, 'nameRecognition')"     value="Start Name Recognition" class="btn btn-default"/>
+                        <input type="button" onclick="start(event, 'intervalRecognition')" value="Start Interval Recognition" class="btn btn-default"/>
+                    </div>
                     <h3 id="successCounter"></h3>
                     <input type="button" class="btn btn-default" value="Show Help" onclick="showHelp(false)" style="margin-bottom: 1em"/>
                     <input type="button" class="btn btn-default" value="Show Full Help" onclick="showHelp(true)" style="margin-bottom: 1em"/>
