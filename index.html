@@ -41,7 +41,7 @@
                 var currentNoteIndex = notes.indexOf(currentNote.charAt(0));
                 var newNoteIndex = (currentNoteIndex + interval) % notes.length;
                 
-                console.log("current: " + currentNoteIndex + " new: " + newNoteIndex + " C: " + notes.indexOf('C'));
+                // console.log("current: " + currentNoteIndex + " new: " + newNoteIndex + " C: " + notes.indexOf('C'));
 
                 if(currentNoteIndex < newNoteIndex) {
                         if(currentNoteIndex != notes.indexOf('C') && 
@@ -72,56 +72,26 @@
                 vf.draw();
             }
 
-            function renderButtons(buttonLabels, functionName) {
-                var buttonsStr = "";
-
-                buttonStr = _.map(buttonLabels, function(label) {
-                    return $.tmpl("<button type='button' onclick=\"#{functionName}('#{label}')\" class='btn btn-default' id='button_#{label}'> #{label} </button>",
-                            {label : label, functionName : functionName});
+            function renderButtons(buttonLabels, functionName, type) {
+                return _.map(buttonLabels, function(label) {
+                    return $.tmpl("<button type='button' onclick=\"#{functionName}('#{label}', '#{type}')\" class='btn btn-default' id='button_#{label}'> #{label} </button>",
+                            {label : label, functionName : functionName, type : type });
                 }).join(' ');
-
-                return buttonStr;
             }
             var successCount = 0;
             var failureCount = 0;
-            function selectedNote(noteName) {
-                if(noteName != desiredNote) {
-                    $("#button_" + noteName).attr("class", "btn btn-danger");
+            function selected(selectedValue, type) {
+                if((type == "note"     && selectedValue != desiredNote) || 
+                   (type == "interval" && selectedValue != desiredInterval)) {
+                    $("#button_" + selectedValue).attr("class", "btn btn-danger");
                     statistics.intervals[askedInterval].failureCount++;
                     statistics.notes[askedNote].failureCount++;
 
                     failureCount++;
                 } else {
-                    $("#button_" + noteName).attr("class", "btn btn-success");
+                    $("#button_" + selectedValue).attr("class", "btn btn-success");
                     var accurateNote = askedNote + "4";
-                    renderNotes([accurateNote, getNoteAccurate(accurateNote, askedInterval)]);                    
-                    setTimeout(askQuestion, $("#delayTime").val());
-
-                    var questionAnsweredTime = new Date().getTime();
-                    var timeDeltaMs = questionAnsweredTime - questionAskedTime;
-
-                    statistics.intervals[askedInterval].successCount++;
-                    statistics.notes[askedNote].successCount++;
-                    successCount++;
-
-                    statistics.intervals[askedInterval].times.push(timeDeltaMs);
-                    statistics.notes[askedNote].times.push(timeDeltaMs);
-                }
-
-                refreshSuccessCounter();
-                refreshCharts();
-            }
-
-            function selectedInterval(interval) {
-                if(interval != desiredInterval) {
-                    $("#button_" + interval).attr("class", "btn btn-danger");
-                    statistics.intervals[askedInterval].failureCount++;
-                    statistics.notes[askedNote].failureCount++;
-
-                    failureCount++;
-                } else {
-                    $("#button_" + interval).attr("class", "btn btn-success");
-                    var accurateNote = askedNote + "4";
+                    if(type == "note") renderNotes([accurateNote, getNoteAccurate(accurateNote, askedInterval)]);                    
                     setTimeout(askQuestion, $("#delayTime").val());
 
                     var questionAnsweredTime = new Date().getTime();
@@ -167,14 +137,13 @@
                         renderNotes([note + "4"]);
 
                         $("#intervalAskerDiv").html("<p> " + note + " -> " + interval + "</p>");
-                        $("#intervalAskerDiv").append(renderButtons(notes.split(''), "selectedNote"));
+                        $("#intervalAskerDiv").append(renderButtons(notes.split(''), "selected", "note"));
                     } break;
                     case "intervalRecognition" : {
                         var accurateNote        = note + "4";
-                        var desiredNoteAccurate = getNoteAccurate(accurateNote, interval - 1)
-                        renderNotes([accurateNote, desiredNoteAccurate]);
+                        renderNotes([accurateNote, getNoteAccurate(accurateNote, interval - 1)]);
                         $("#intervalAskerDiv").html("<p> " + note + " -> " + desiredNote + "</p>");
-                        $("#intervalAskerDiv").append(renderButtons(_.range(2,8), "selectedInterval"));
+                        $("#intervalAskerDiv").append(renderButtons(_.range(2,8), "selected", "interval"));
                     } break;
                 }
                 lastAskedNote = askedNote;
@@ -212,7 +181,16 @@
                     data: {
                       x : 'x',
                       columns: [],                      
-                      type : 'bar'
+                      type : 'bar',
+                      onclick : function (d, element) {
+                        var times = null
+                        if(d.id == "Intervals") times = statistics.intervals[_.range(2, 8)[d.index]].times;                            
+                        else                    times = statistics.notes[notes.split('')[d.index]].times;                             
+                        times.unshift(d.id);
+
+                        var tempChart = createChart("tempChart", 10000, "Intervals");
+                        tempChart.load({ columns : [['x'].concat(_.range(1, 10000)), times]});
+                      }
                     },
                     legend : {
                         show : false
@@ -229,7 +207,13 @@
                                 position: 'outer-middle'
                             }
                         }
+                    },
+                    tooltip : {
+                        format : {
+                            value : function (val) { return val.toFixed(2);}
+                        }
                     }
+                    
                 });
             }
 
@@ -331,6 +315,7 @@
                 </div>
             </div>
             <div id="charts" class="row"></div>
+            <div id="tempChart"></div>
             <div style="clear:both"></div>
         </div>
     </body>
