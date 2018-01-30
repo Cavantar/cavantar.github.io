@@ -74,9 +74,11 @@
 
             function renderButtons(buttonLabels, functionName, type) {
                 return _.map(buttonLabels, label =>
-                            $.tmpl("<button type='button' onclick=\"#{functionName}('#{label}', '#{type}')\" class='btn btn-default' id='button_#{label}'> #{label} </button>",
-                            {label : label, functionName : functionName, type : type })
-                ).join(' ');
+                            $("<button>", { 
+                                type : "button", onclick: functionName+"('"+label +"','"+ type+"')", 
+                                class:"btn btn-default", id:"button_" + label}).text(label));
+                            //$.tmpl("<button type='button' onclick=\"#{functionName}('#{label}', '#{type}')\" class='btn btn-default' id='button_#{label}'> #{label} </button>",
+                            // {label : label, functionName : functionName, type : type })
             }
             var successCount = 0;
             var failureCount = 0;
@@ -124,7 +126,7 @@
             var desiredNote     = null;
             var questionAskedTime = 0;
             function askQuestion() {
-                askedNote    = _.sample(_.filter(notes.split(''), function(note) { return $("#note_" + note).is(":checked") && note != askedNote; }));
+                askedNote     = _.sample(_.filter(notes.split(''), function(note) { return $("#note_" + note).is(":checked") && note != askedNote; }));
                 askedInterval = _.sample(_.range(2, 8).filter(function(interval) { return $("#interval_" + interval).is(":checked")}))
                 desiredNote  = getNote(askedNote, askedInterval);                                        
                 var accurateNote = askedNote + "4";
@@ -160,7 +162,7 @@
                     $("<div>", { class : stringForGrid(2)}).append("Delay time", $("<input/>", { type: "number", value: 0, id : "delayTime"}))
                 );
                 $("#charts").append(
-                    $("<h2>", {style : "text-align: center"}).text("Charts"),
+                    $("<h2>", {style : "text-align: center"}).text("Statistics"),
                     _.map(["intervalChart", "noteChart", "intervalChartMs", "noteChartMs"], 
                           id => $("<div>", { class : stringForGrid(6), id : id, style : "height: 300px" }))
                 );
@@ -271,25 +273,63 @@
                 noteChartMs     = createChart('noteChartMs'    , 10000, "Time [ms]");
 
                 refreshCharts();
+                // start("intervalRecognition");
+                // start("noteRecognition");
+
+                $(document).keyup(event => {
+                    _.mapIfExists(
+                        { "noteRecognition"     : { type: "note"    , values: notes.split('') },
+                          "intervalRecognition" : { type: "interval", values: _.range(2,7)  } }
+                          [globalMode], currentMode => 
+                        _.filter(currentMode.values, value => value.toString().charCodeAt(0) == event.which)
+                         .forEach(value => selected(value.toString(), currentMode.type)));
+
+                });
             });
-            function start(event, mode) {
-                event.target.parentNode.style.display = "none";
+            _.mapIfExists = (val, f) => val != null ? f(val) : 0;
+            function start(mode) {
+                // event.target.parentNode.style.display = "none";
+                $("#startButtons").hide();
                 globalMode = mode;
                 askQuestion();
             }
 
+            var testEmployee = {
+                        "first_name" : "John",
+                        "last_name" :  "Smith",
+                        "age" :        25,
+                        "about" :      "I love to go rock climbing",
+                        "interests": [ "sports", "music" ]
+                    };
+            function testElastic() {
+                $.ajax({
+                    url: 'http://localhost:9200/megacorp/employee/',
+                    type: 'POST',
+                    data: JSON.stringify(testEmployee),
+                    // dataType: 'json',
+                    // crossDomain : true,
+                    success: function(data) {
+                        document.write(data);
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        console.log(textStatus);
+                        console.log(errorThrown);
+                    },
+                });
+            }
         </script>
     </head>
     <body class="container-fluid">
         <div class="well well-lg" style="margin-top: 20px;">
             <h2> Interval Asker</h2>
+            <button class="btn btn-primary" onclick="testElastic()" style="display:none">Test</button>
             <div class="row">
                 <div class="col-sm-6">        
                     <div id="staffDisplayDiv"></div>
                     <div id="intervalAskerDiv"></div>
-                    <div id="startButtons" >
-                        <input type="button" onclick="start(event, 'noteRecognition')"     value="Start Note Recognition" class="btn btn-default"/>
-                        <input type="button" onclick="start(event, 'intervalRecognition')" value="Start Interval Recognition" class="btn btn-default"/>
+                    <div id="startButtons">
+                        <input type="button" onclick="start('noteRecognition')"     value="Start Note Recognition" class="btn btn-default"/>
+                        <input type="button" onclick="start('intervalRecognition')" value="Start Interval Recognition" class="btn btn-default"/>
                     </div>
                     <h3 id="successCounter"></h3>
                     <input type="button" class="btn btn-default" value="Show Help" onclick="showHelp(false)" style="margin-bottom: 1em"/>
